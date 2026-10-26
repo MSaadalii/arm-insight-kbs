@@ -1,0 +1,10 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import {diagnose} from './dist/engine.mjs';
+const kb=JSON.parse(fs.readFileSync('dist/knowledge_base.json')),cases=JSON.parse(fs.readFileSync('dist/sample_cases.json'));
+for(const c of cases)assert.deepEqual(diagnose(kb,c.evidence).results.filter(f=>f.status==='Supported').map(f=>f.id).sort(),[...c.expected_supported].sort(),c.name);
+assert.equal(diagnose(kb,{protective_stop:'yes'}).results.find(f=>f.id==='payload').status,'Possible');
+assert.equal(diagnose(kb,{protective_stop:'yes',payload_mismatch:'no'}).results.find(f=>f.id==='payload').status,'Contradicted');
+assert.equal(diagnose(kb,{protective_stop:'yes',payload_mismatch:'conflict'}).results.find(f=>f.id==='payload').status,'Conflicted');
+assert.equal(diagnose(kb,{smoke:'conflict'}).alerts[0],'smoke');
+for(const p of ['Safety first','Lower cost','Less downtime'])assert.equal(diagnose(kb,{brake_alarm:'yes',joint_droop:'yes',protective_stop:'yes',payload_mismatch:'yes'},p).results[0].id,'brake');
+assert.throws(()=>diagnose(kb,{bad:'yes'}));
+console.log('13 sample scenarios and 8 inference checks passed.');

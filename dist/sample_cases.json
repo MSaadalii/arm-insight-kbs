@@ -1,0 +1,124 @@
+[
+  {
+    "name": "Payload configuration mismatch",
+    "evidence": {
+      "protective_stop": "yes",
+      "payload_mismatch": "yes"
+    },
+    "expected_supported": [
+      "payload"
+    ]
+  },
+  {
+    "name": "Joint mechanical degradation",
+    "evidence": {
+      "joint_noise": "yes",
+      "joint_friction": "yes",
+      "position_drift": "yes"
+    },
+    "expected_supported": [
+      "mechanical"
+    ]
+  },
+  {
+    "name": "Cooling-related overheating",
+    "evidence": {
+      "overtemperature": "yes",
+      "cooling_blocked": "yes"
+    },
+    "expected_supported": [
+      "thermal"
+    ]
+  },
+  {
+    "name": "Position feedback fault",
+    "evidence": {
+      "encoder_alarm": "yes",
+      "feedback_unstable": "yes"
+    },
+    "expected_supported": [
+      "encoder"
+    ]
+  },
+  {
+    "name": "Pneumatic grip fault",
+    "evidence": {
+      "grip_loss": "yes",
+      "pressure_low": "yes"
+    },
+    "expected_supported": [
+      "gripper"
+    ]
+  },
+  {
+    "name": "Communication connection fault",
+    "evidence": {
+      "communication_alarm": "yes",
+      "connection_damage": "yes"
+    },
+    "expected_supported": [
+      "communication"
+    ]
+  },
+  {
+    "name": "Power supply fault",
+    "evidence": {
+      "power_alarm": "yes",
+      "supply_unstable": "yes"
+    },
+    "expected_supported": [
+      "power"
+    ]
+  },
+  {
+    "name": "Joint holding / brake fault",
+    "evidence": {
+      "brake_alarm": "yes",
+      "joint_droop": "yes"
+    },
+    "expected_supported": [
+      "brake"
+    ]
+  },
+  {
+    "name": "Insufficient evidence",
+    "evidence": {},
+    "expected_supported": []
+  },
+  {
+    "name": "Conflicting payload reports",
+    "evidence": {
+      "protective_stop": "yes",
+      "payload_mismatch": "conflict"
+    },
+    "expected_supported": []
+  },
+  {
+    "name": "Negative evidence",
+    "evidence": {
+      "protective_stop": "yes",
+      "payload_mismatch": "no"
+    },
+    "expected_supported": []
+  },
+  {
+    "name": "Two simultaneous faults",
+    "evidence": {
+      "protective_stop": "yes",
+      "payload_mismatch": "yes",
+      "grip_loss": "yes",
+      "pressure_low": "yes"
+    },
+    "expected_supported": [
+      "payload",
+      "gripper"
+    ]
+  },
+  {
+    "name": "Immediate safety escalation",
+    "evidence": {
+      "smoke": "yes"
+    },
+    "expected_supported": []
+  }
+]

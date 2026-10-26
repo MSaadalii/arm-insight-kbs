@@ -1,0 +1,168 @@
+{
+  "version": "2.1",
+  "scope": "Educational generic industrial robotic arm; no live control",
+  "symptoms": {
+    "protective_stop": "Protective stop reported",
+    "payload_mismatch": "Configured payload / centre of gravity differs from tool",
+    "position_drift": "Repeated positioning drift",
+    "joint_noise": "Abnormal joint noise",
+    "joint_friction": "Abnormal joint friction reported by qualified inspection",
+    "overtemperature": "Controller reports overtemperature",
+    "cooling_blocked": "Cooling path obstructed",
+    "encoder_alarm": "Encoder / position feedback alarm",
+    "feedback_unstable": "Position feedback unstable",
+    "grip_loss": "Gripper loses workpiece",
+    "pressure_low": "Pneumatic pressure below equipment specification",
+    "communication_alarm": "Communication fault alarm",
+    "connection_damage": "Visible cable / connector damage",
+    "power_alarm": "Supply voltage alarm",
+    "supply_unstable": "Supply instability verified by qualified personnel",
+    "brake_alarm": "Brake fault alarm",
+    "joint_droop": "Unexpected joint droop",
+    "smoke": "Smoke or burning smell",
+    "unexpected_motion": "Unexpected motion observed"
+  },
+  "faults": [
+    {
+      "id": "payload",
+      "name": "Payload configuration mismatch",
+      "component": "Tool configuration",
+      "conditions": [
+        "protective_stop",
+        "payload_mismatch"
+      ],
+      "severity": "High",
+      "cost": "Low",
+      "downtime": "Short",
+      "cause": "Incorrect tool mass or centre-of-gravity configuration.",
+      "action": "Compare tool and workpiece data with approved payload settings; have an authorized technician correct configuration.",
+      "provenance": "UR protective-stop guidance; illustrative diagnostic conjunction."
+    },
+    {
+      "id": "mechanical",
+      "name": "Joint mechanical degradation",
+      "component": "Joint / transmission",
+      "conditions": [
+        "joint_noise",
+        "joint_friction",
+        "position_drift"
+      ],
+      "severity": "High",
+      "cost": "High",
+      "downtime": "Long",
+      "cause": "Possible wear, looseness or abnormal friction.",
+      "action": "Keep equipment out of service pending qualified joint inspection; follow the model-specific service manual.",
+      "provenance": "UR guidance associates abnormal friction with possible mechanical failure; three-symptom rule is illustrative."
+    },
+    {
+      "id": "thermal",
+      "name": "Cooling-related overheating",
+      "component": "Motor / controller cooling",
+      "conditions": [
+        "overtemperature",
+        "cooling_blocked"
+      ],
+      "severity": "High",
+      "cost": "Medium",
+      "downtime": "Medium",
+      "cause": "Restricted heat dissipation.",
+      "action": "Qualified maintenance should inspect cooling paths and the reported temperature alarm using the equipment manual.",
+      "provenance": "Educational engineering assumption; not manufacturer-validated."
+    },
+    {
+      "id": "encoder",
+      "name": "Position feedback fault",
+      "component": "Encoder / feedback circuit",
+      "conditions": [
+        "encoder_alarm",
+        "feedback_unstable"
+      ],
+      "severity": "High",
+      "cost": "Medium",
+      "downtime": "Medium",
+      "cause": "Possible encoder or feedback wiring issue.",
+      "action": "Have qualified personnel inspect feedback diagnostics and wiring with the robot safely isolated.",
+      "provenance": "Educational engineering assumption; not manufacturer-validated."
+    },
+    {
+      "id": "gripper",
+      "name": "Pneumatic grip fault",
+      "component": "End effector",
+      "conditions": [
+        "grip_loss",
+        "pressure_low"
+      ],
+      "severity": "High",
+      "cost": "Low",
+      "downtime": "Short",
+      "cause": "Insufficient pneumatic supply or leakage.",
+      "action": "Secure the workpiece and isolate stored energy; qualified personnel should inspect air supply and leaks.",
+      "provenance": "Educational engineering assumption; not manufacturer-validated."
+    },
+    {
+      "id": "communication",
+      "name": "Communication connection fault",
+      "component": "Communication harness",
+      "conditions": [
+        "communication_alarm",
+        "connection_damage"
+      ],
+      "severity": "Medium",
+      "cost": "Medium",
+      "downtime": "Medium",
+      "cause": "Damaged connector or communication cable.",
+      "action": "Qualified personnel should inspect the affected cable and connection after safe isolation.",
+      "provenance": "Educational engineering assumption; not manufacturer-validated."
+    },
+    {
+      "id": "power",
+      "name": "Power supply fault",
+      "component": "Power system",
+      "conditions": [
+        "power_alarm",
+        "supply_unstable"
+      ],
+      "severity": "High",
+      "cost": "Medium",
+      "downtime": "Medium",
+      "cause": "Unstable or inadequate electrical supply.",
+      "action": "Refer supply diagnostics to qualified electrical maintenance; follow approved isolation procedures.",
+      "provenance": "Educational engineering assumption; not manufacturer-validated."
+    },
+    {
+      "id": "brake",
+      "name": "Joint holding / brake fault",
+      "component": "Joint brake",
+      "conditions": [
+        "brake_alarm",
+        "joint_droop"
+      ],
+      "severity": "Critical",
+      "cost": "High",
+      "downtime": "Long",
+      "cause": "Possible brake holding failure.",
+      "action": "Restrict access, secure supported loads using approved procedures, and request qualified service.",
+      "provenance": "Educational engineering assumption; not manufacturer-validated."
+    }
+  ],
+  "sources": [
+    {
+      "title": "Universal Robots - Understanding Protective Stops",
+      "url": "https://www.universal-robots.com/articles/ur/robot-care-maintenance/understanding-protective-stops/",
+      "accessed": "2026-10-23",
+      "use": "Payload and abnormal friction concepts; exact conditions are project assumptions."
+    },
+    {
+      "title": "Universal Robots - C162 Error Code",
+      "url": "https://www.universal-robots.com/manuals/EN/HTML/SW5_19/Content/prod-err-codes/topics/CODE_162.html",
+      "accessed": "2026-10-23",
+      "use": "Manufacturer example linking incorrect payload mass/centre of gravity to protective stops."
+    },
+    {
+      "title": "Universal Robots - e-Series Service Handbook, Protective Stop",
+      "url": "https://www.universal-robots.com/manuals/EN/PDF/SW5_24/service-manual_e-series/e-Series_Service_Manual_en.pdf",
+      "accessed": "2026-10-23",
+      "use": "Troubleshooting flow for payload settings and abnormal joint friction; model-specific reference only."
+    }
+  ]
+}
