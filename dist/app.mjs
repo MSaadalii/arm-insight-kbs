@@ -28,16 +28,54 @@ function queueCloudSync(){if(!cloudEnabled())return;clearTimeout(cloudTimer);clo
 function persist(){w.kb=kb;w.draft=draft();try{localStorage.setItem(KEY,JSON.stringify(w));queueCloudSync();return true;}catch{toast('Storage unavailable or full. Export a backup to keep your work.');return false;}}
 function modal(html){$('modalcontent').innerHTML=html;$('modal').showModal();}
 function close(){ $('modal').close(); }
-function page(id){document.querySelectorAll('.page').forEach(x=>x.hidden=x.id!==id);document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$('pagetitle').textContent={studio:'Diagnostic studio',cases:'Case history',maintenance:'Maintenance board',rules:'Rule explorer',evaluation:'Evaluation lab'}[id];if(id==='cases')renderCases();if(id==='maintenance')renderBoard();if(id==='rules')renderRules();}
+function pulseEnter(el){if(!el)return;el.classList.remove('pulse-in','reenter');void el.offsetWidth;el.classList.add('pulse-in','reenter');}
+function page(id){document.querySelectorAll('.page').forEach(x=>x.hidden=x.id!==id);document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$('pagetitle').textContent={studio:'Diagnostic studio',cases:'Case history',maintenance:'Maintenance board',rules:'Rule explorer',evaluation:'Evaluation lab'}[id];const shown=$(id);if(shown)pulseEnter(shown);if(id==='cases')renderCases();if(id==='maintenance')renderBoard();if(id==='rules')renderRules();}
 function setDraft(d){evidence={...d.evidence};records=structuredClone(d.records||{});$('casename').value=d.name||'';$('asset').value=d.asset||'';$('notes').value=d.notes||'';$('policy').value=d.policy||'Safety first';$('demo').value='';$('search').value='';$('component').value='';renderSymptoms();render();}
 function useDemo(i){const c=demos[i];setDraft({evidence:c.evidence,name:c.name+' (demo)',asset:'DEMO-ARM-01',notes:'Synthetic demonstration scenario.',policy:'Safety first'});$('demo').value=i;}
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+async function runVivaDemo(){
+  const btn=$('vivademo');if(btn){btn.disabled=true;btn.textContent='Running…';}
+  try{
+    page('studio');
+    toast('Viva demo · Step 1: supported payload fault');
+    useDemo(0);
+    await wait(1600);
+    toast('Step 2: conflicting sources on the same symptom');
+    setDraft({
+      evidence:{protective_stop:'yes',payload_mismatch:'conflict'},
+      records:{
+        payload_mismatch:[
+          {source:'Operator observation',state:'yes',note:'Viva demo · operator reports mismatch',at:new Date().toISOString()},
+          {source:'Sensor / controller',state:'no',note:'Viva demo · controller disagrees',at:new Date().toISOString()}
+        ]
+      },
+      name:'Conflicting payload reports (viva)',
+      asset:'DEMO-ARM-01',
+      notes:'Guided viva walkthrough: opposing Yes/No claims block full rule support.',
+      policy:'Safety first'
+    });
+    await wait(1800);
+    toast('Step 3: evaluation lab · 13 synthetic scenarios');
+    page('evaluation');
+    await wait(500);
+    evaluate();
+    toast('Viva demo complete · explain the PASS rows and conflict rule.');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='▶ Viva demo';}
+  }
+}
+function dismissSplash(){
+  const s=$('splash');if(!s||s.classList.contains('done'))return;
+  s.classList.add('done');s.setAttribute('aria-hidden','true');
+}
 function renderSymptoms(){let filter=$('component').value,term=$('search').value.toLowerCase(),conditions=kb.faults.find(f=>f.id===filter)?.conditions;
  $('symptoms').innerHTML=Object.entries(kb.symptoms).filter(([k,label])=>(!conditions||conditions.includes(k))&&label.toLowerCase().includes(term)).map(([k,label])=>`<div class="symptom" id="sym-${k}"><div class="slabel" id="lbl-${k}">${E(label)}${records[k]?.length?`<small>${records[k].length} source claim(s) logged</small>`:''}</div><div class="segments" role="group" aria-labelledby="lbl-${k}">${states.map((s,i)=>`<button data-key="${k}" data-state="${s}" aria-label="${s}" aria-pressed="${(evidence[k]||'unknown')===s}" class="${(evidence[k]||'unknown')===s?'chosen':''}">${['?','Yes','No','!'][i]}</button>`).join('')}</div></div>`).join('')||'<div class="empty">No matching observations.</div>';}
 function render(){report=diagnose(kb,evidence,$('policy').value);let known=Object.values(report.facts).filter(s=>s!=='unknown').length;const supported=report.results.filter(f=>f.status==='Supported');$('supported').textContent=supported.length;$('complete').innerHTML=Math.round(100*known/Object.keys(kb.symptoms).length)+'<em>%</em>';$('observedcount').textContent=`${known} of ${Object.keys(kb.symptoms).length} observations recorded`;$('conflicts').textContent=report.conflicts.length;$('alerts').textContent=report.alerts.length;$('rulecount').textContent=kb.faults.length+' active rules';$('mapstatus').textContent=known?`${supported.length} supported hypotheses · ${known} observations`:'Awaiting observations';
+ document.querySelectorAll('.metrics strong').forEach(el=>{el.classList.remove('tick');void el.offsetWidth;el.classList.add('tick');});
  document.querySelectorAll('.hotspot').forEach(g=>g.classList.toggle('alerted',report.results.some(f=>f.id===g.dataset.component&&f.status==='Supported')));
  $('safety').innerHTML=(report.alerts.length?`<div class="alert"><b>Safety escalation</b> · ${report.alerts.map(k=>E(kb.symptoms[k])).join(' · ')}<br>Follow site emergency procedures, keep personnel clear and contact qualified maintenance. No automatic restart.</div>`:'')+(report.conflicts.length?`<div class="alert"><b>Conflicting evidence</b> · ${report.conflicts.map(k=>E(kb.symptoms[k])).join(' · ')}<br>Verify the source before these observations can support a conclusion.</div>`:'');
  const visible=report.results.filter(f=>f.status!=='Unassessed');$('findings').innerHTML=visible.length?visible.map((f,i)=>`<details class="fault" ${i===0?'open':''}><summary><span class="status ${f.status}">${f.status}</span><span class="badge">${f.severity}</span><h3>${E(f.name)}</h3><div class="micro">${E(f.component)} · ${f.coverage}% coverage</div><div class="meter"><i style="width:${f.coverage}%"></i></div></summary><div class="faultbody"><p>${E(f.cause)}</p>${Object.entries(f.groups).filter(([s,ks])=>ks.length).map(([s,ks])=>`<div class="evidence-line"><b>${s}</b>${ks.map(k=>E(kb.symptoms[k])).join(' · ')}</div>`).join('')}${f.status==='Supported'?`<div class="action"><b>Recommended maintenance</b><br>${E(f.action)}<p>Relative cost: ${f.cost} · Downtime: ${f.downtime}</p><button class="smallbutton" data-ticket="${f.id}">＋ Create maintenance task</button></div>`:''}<div class="micro">${E(f.provenance)}</div></div></details>`).join(''):`<div class="panel empty"><div class="target">◎</div><h3>Start with what you observe.</h3><p>Select symptoms, take a guided assessment, or explore a sample investigation.</p><button class="primary" id="trydemo">Explore a payload fault ↗</button></div>`;
- $('nextquestions').innerHTML=report.questions.length?`<div class="questionbox"><h3>Next best checks</h3>${report.questions.slice(0,4).map(k=>`<button data-question="${k}">↗ ${E(kb.symptoms[k])}</button>`).join('')}</div>`:'';$('tracecount').textContent=report.trace.length+' steps';$('trace').innerHTML=report.trace.map((t,i)=>`<div class="trace-step">${String(i+1).padStart(2,'0')} / ${E(t)}</div>`).join('')||'<p class="micro">No inference steps yet.</p>';$('casebadge').textContent=w.cases.length;persist();}
+ $('nextquestions').innerHTML=report.questions.length?`<div class="questionbox"><h3>Next best checks</h3>${report.questions.slice(0,4).map(k=>`<button data-question="${k}">↗ ${E(kb.symptoms[k])}</button>`).join('')}</div>`:'';$('tracecount').textContent=report.trace.length+' steps';$('trace').innerHTML=report.trace.map((t,i)=>`<div class="trace-step" style="--i:${i}">${String(i+1).padStart(2,'0')} / ${E(t)}</div>`).join('')||'<p class="micro">No inference steps yet.</p>';$('casebadge').textContent=w.cases.length;pulseEnter($('findings'));persist();}
 function guided(){const candidates=[...report.questions,...Object.keys(kb.symptoms).filter(k=>(evidence[k]||'unknown')==='unknown')];const k=candidates.find(k=>!guideSeen.has(k));if(!k){modal('<h2>Assessment complete</h2><p>All remaining observations were reviewed or skipped. Inspect the findings and resolve missing evidence when it becomes available.</p><button class="primary" data-close>View findings</button>');return;}modal(`<div class="eyebrow">GUIDED EVIDENCE COLLECTION</div><h2 style="margin-top:16px">One observation at a time.</h2><p>Record known information only. Do not perform physical tests without approved procedures.</p><div class="guidedquestion">${E(kb.symptoms[k])}?</div><div class="guidedanswers">${states.map((s,i)=>`<button class="${s==='yes'?'primary':'secondary'}" data-answer="${s}" data-key="${k}">${['Skip','Yes','No','Conflict'][i]}</button>`).join('')}</div><div class="modalbuttons"><button class="quiet" data-close>Finish assessment</button></div>`);}
 
 function showEvidenceDialog(){
@@ -72,9 +110,21 @@ try{[base,demos]=await Promise.all(['knowledge_base.json','sample_cases.json'].m
  }else setSyncUI('local');
  kb=w.kb;
  for(const [i,c] of demos.entries())$('demo').add(new Option(c.name,i));for(const f of kb.faults)$('component').add(new Option(f.component,f.id));$('loading').hidden=true;$('studio').hidden=false;setDraft(w.draft||{evidence:{}});
+ // Soft blended glow that follows the pointer
+ const glow=$('cursor-glow');
+ if(glow&&window.matchMedia('(pointer:fine)').matches&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  let gx=-999,gy=-999,tx=-999,ty=-999;
+  document.body.classList.add('has-cursor-glow');
+  window.addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;glow.classList.add('on');},{passive:true});
+  window.addEventListener('pointerleave',()=>glow.classList.remove('on'));
+  (function follow(){gx+=(tx-gx)*.14;gy+=(ty-gy)*.14;glow.style.transform=`translate3d(${gx}px,${gy}px,0) translate(-50%,-50%)`;requestAnimationFrame(follow);})();
+ }
  document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>page(b.dataset.page));$('theme').onclick=()=>document.body.classList.toggle('light');$('search').oninput=renderSymptoms;$('component').onchange=renderSymptoms;$('policy').onchange=render;['casename','asset','notes'].forEach(k=>$(k).oninput=persist);$('demo').onchange=()=>{if($('demo').value!=='')useDemo(Number($('demo').value));};
  if($('cloudsync'))$('cloudsync').onclick=()=>syncCloud(true);
- $('symptoms').onclick=e=>{const b=e.target.closest('[data-key]');if(!b)return;evidence[b.dataset.key]=b.dataset.state;delete records[b.dataset.key];$('demo').value='';b.parentElement.querySelectorAll('button').forEach(x=>{x.classList.toggle('chosen',x===b);x.setAttribute('aria-pressed',x===b);});render();};
+ $('symptoms').onclick=e=>{const b=e.target.closest('[data-key]');if(!b)return;evidence[b.dataset.key]=b.dataset.state;delete records[b.dataset.key];$('demo').value='';b.parentElement.querySelectorAll('button').forEach(x=>{x.classList.toggle('chosen',x===b);x.setAttribute('aria-pressed',x===b);x.classList.remove('pop');});b.classList.add('pop');render();};
+ if($('vivademo'))$('vivademo').onclick=()=>runVivaDemo();
+ setTimeout(dismissSplash,window.matchMedia('(prefers-reduced-motion: reduce)').matches?150:2100);
+ if($('splash'))$('splash').onclick=dismissSplash;
  $('newcase').onclick=()=>{modal('<h2>Start a new investigation?</h2><p>The current draft will be cleared. Save it first if you need to keep it.</p><div class="modalbuttons"><button class="secondary" data-close>Cancel</button><button class="primary" id="confirmnew">Start new</button></div>');};
  $('guided').onclick=()=>{guideSeen=new Set();guided();};$('addevidence').onclick=showEvidenceDialog;$('savecase').onclick=()=>{const d=draft();if(!d.name.trim()){toast('Enter a case name first.');$('casename').focus();return;}const item={...d,id:uid(),created:new Date().toISOString(),kb:structuredClone(kb)};w.cases.unshift(item);if(!persist()){w.cases.shift();return;}render();toast('Investigation saved locally.');};
  $('findings').onclick=e=>{if(e.target.id==='trydemo')useDemo(0);const b=e.target.closest('[data-ticket]');if(b){const f=report.results.find(f=>f.id===b.dataset.ticket);const asset=$('asset').value;if(w.tickets.some(t=>t.fault===f.id&&t.asset===asset&&t.status!=='Completed')){toast('An active task already exists for this fault and asset.');return;}w.tickets.push({id:uid(),fault:f.id,name:f.name,action:f.action,severity:f.severity,asset,status:'Open'});persist();toast('Task added to maintenance board.');}};
