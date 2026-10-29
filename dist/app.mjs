@@ -1,25 +1,81 @@
 import {diagnose} from './engine.mjs';
 import {validateKB,validateWorkspace} from './state.mjs';
 import {SOURCES,resolveClaims} from './evidence.mjs';
+import {cloudEnabled,pullWorkspace,pushWorkspace} from './cloud.mjs';
 const $=id=>document.getElementById(id), E=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
-const KEY='arm-insight-v2',states=['unknown','yes','no','conflict'];let base,kb,demos,w,evidence={},records={},report,selected=new Set(),toastTimer,guideSeen=new Set();
+const KEY='arm-insight-v2',states=['unknown','yes','no','conflict'];let base,kb,demos,w,evidence={},records={},report,selected=new Set(),toastTimer,guideSeen=new Set(),cloudTimer=null,cloudBusy=false;
 function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3500);}
 function download(name,data,type='application/json'){const u=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);}
 function draft(){return {evidence:{...evidence},records:structuredClone(records),name:$('casename').value,asset:$('asset').value,notes:$('notes').value,policy:$('policy').value};}
-function persist(){w.kb=kb;w.draft=draft();try{localStorage.setItem(KEY,JSON.stringify(w));return true;}catch{toast('Storage unavailable or full. Export a backup to keep your work.');return false;}}
+function setSyncUI(mode,detail){
+  const label=$('synclabel'),dot=$('syncdot'),info=$('syncdetail'),btn=$('cloudsync');
+  if(!label)return;
+  const map={local:['Local workspace','Saved in this browser<br>No robot connection'],ready:['Cloud sync ready','Supabase connected · browser + cloud'],syncing:['Syncing…','Pushing workspace to Supabase'],ok:['Synced to Supabase','Cases and tasks mirrored in cloud'],err:['Cloud sync issue',detail||'Check config / schema / network']};
+  const [t,d]=map[mode]||map.local;label.textContent=t;info.innerHTML=d;if(btn)btn.hidden=!cloudEnabled();if(dot)dot.style.background=mode==='err'?'#c45c5c':mode==='ok'||mode==='ready'?'#3d9a78':'#6a7989';
+}
+async function syncCloud(manual=false){
+  if(!cloudEnabled()||cloudBusy)return;
+  cloudBusy=true;setSyncUI('syncing');
+  try{
+    w.kb=kb;w.draft=draft();
+    await pushWorkspace(w);
+    setSyncUI('ok');if(manual)toast('Workspace synced to Supabase.');
+  }catch(err){setSyncUI('err',E(err.message));if(manual)toast('Supabase sync failed: '+err.message);}
+  finally{cloudBusy=false;}
+}
+function queueCloudSync(){if(!cloudEnabled())return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>syncCloud(false),1200);}
+function persist(){w.kb=kb;w.draft=draft();try{localStorage.setItem(KEY,JSON.stringify(w));queueCloudSync();return true;}catch{toast('Storage unavailable or full. Export a backup to keep your work.');return false;}}
 function modal(html){$('modalcontent').innerHTML=html;$('modal').showModal();}
 function close(){ $('modal').close(); }
-function page(id){document.querySelectorAll('.page').forEach(x=>x.hidden=x.id!==id);document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$('pagetitle').textContent={studio:'Diagnostic studio',cases:'Case history',maintenance:'Maintenance board',rules:'Rule explorer',evaluation:'Evaluation lab'}[id];if(id==='cases')renderCases();if(id==='maintenance')renderBoard();if(id==='rules')renderRules();}
+function pulseEnter(el){if(!el)return;el.classList.remove('pulse-in','reenter');void el.offsetWidth;el.classList.add('pulse-in','reenter');}
+function page(id){document.querySelectorAll('.page').forEach(x=>x.hidden=x.id!==id);document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===id));$('pagetitle').textContent={studio:'Diagnostic studio',cases:'Case history',maintenance:'Maintenance board',rules:'Rule explorer',evaluation:'Evaluation lab'}[id];const shown=$(id);if(shown)pulseEnter(shown);if(id==='cases')renderCases();if(id==='maintenance')renderBoard();if(id==='rules')renderRules();}
 function setDraft(d){evidence={...d.evidence};records=structuredClone(d.records||{});$('casename').value=d.name||'';$('asset').value=d.asset||'';$('notes').value=d.notes||'';$('policy').value=d.policy||'Safety first';$('demo').value='';$('search').value='';$('component').value='';renderSymptoms();render();}
 function useDemo(i){const c=demos[i];setDraft({evidence:c.evidence,name:c.name+' (demo)',asset:'DEMO-ARM-01',notes:'Synthetic demonstration scenario.',policy:'Safety first'});$('demo').value=i;}
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+async function runVivaDemo(){
+  const btn=$('vivademo');if(btn){btn.disabled=true;btn.textContent='Running…';}
+  try{
+    page('studio');
+    toast('Viva demo · Step 1: supported payload fault');
+    useDemo(0);
+    await wait(1600);
+    toast('Step 2: conflicting sources on the same symptom');
+    setDraft({
+      evidence:{protective_stop:'yes',payload_mismatch:'conflict'},
+      records:{
+        payload_mismatch:[
+          {source:'Operator observation',state:'yes',note:'Viva demo · operator reports mismatch',at:new Date().toISOString()},
+          {source:'Sensor / controller',state:'no',note:'Viva demo · controller disagrees',at:new Date().toISOString()}
+        ]
+      },
+      name:'Conflicting payload reports (viva)',
+      asset:'DEMO-ARM-01',
+      notes:'Guided viva walkthrough: opposing Yes/No claims block full rule support.',
+      policy:'Safety first'
+    });
+    await wait(1800);
+    toast('Step 3: evaluation lab · 13 synthetic scenarios');
+    page('evaluation');
+    await wait(500);
+    evaluate();
+    toast('Viva demo complete · explain the PASS rows and conflict rule.');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='▶ Viva demo';}
+  }
+}
+function dismissSplash(){
+  const s=$('splash');if(!s||s.classList.contains('done'))return;
+  s.classList.add('done');s.setAttribute('aria-hidden','true');
+}
 function renderSymptoms(){let filter=$('component').value,term=$('search').value.toLowerCase(),conditions=kb.faults.find(f=>f.id===filter)?.conditions;
  $('symptoms').innerHTML=Object.entries(kb.symptoms).filter(([k,label])=>(!conditions||conditions.includes(k))&&label.toLowerCase().includes(term)).map(([k,label])=>`<div class="symptom" id="sym-${k}"><div class="slabel" id="lbl-${k}">${E(label)}${records[k]?.length?`<small>${records[k].length} source claim(s) logged</small>`:''}</div><div class="segments" role="group" aria-labelledby="lbl-${k}">${states.map((s,i)=>`<button data-key="${k}" data-state="${s}" aria-label="${s}" aria-pressed="${(evidence[k]||'unknown')===s}" class="${(evidence[k]||'unknown')===s?'chosen':''}">${['?','Yes','No','!'][i]}</button>`).join('')}</div></div>`).join('')||'<div class="empty">No matching observations.</div>';}
 function render(){report=diagnose(kb,evidence,$('policy').value);let known=Object.values(report.facts).filter(s=>s!=='unknown').length;const supported=report.results.filter(f=>f.status==='Supported');$('supported').textContent=supported.length;$('complete').innerHTML=Math.round(100*known/Object.keys(kb.symptoms).length)+'<em>%</em>';$('observedcount').textContent=`${known} of ${Object.keys(kb.symptoms).length} observations recorded`;$('conflicts').textContent=report.conflicts.length;$('alerts').textContent=report.alerts.length;$('rulecount').textContent=kb.faults.length+' active rules';$('mapstatus').textContent=known?`${supported.length} supported hypotheses · ${known} observations`:'Awaiting observations';
+ document.querySelectorAll('.metrics strong').forEach(el=>{el.classList.remove('tick');void el.offsetWidth;el.classList.add('tick');});
  document.querySelectorAll('.hotspot').forEach(g=>g.classList.toggle('alerted',report.results.some(f=>f.id===g.dataset.component&&f.status==='Supported')));
  $('safety').innerHTML=(report.alerts.length?`<div class="alert"><b>Safety escalation</b> · ${report.alerts.map(k=>E(kb.symptoms[k])).join(' · ')}<br>Follow site emergency procedures, keep personnel clear and contact qualified maintenance. No automatic restart.</div>`:'')+(report.conflicts.length?`<div class="alert"><b>Conflicting evidence</b> · ${report.conflicts.map(k=>E(kb.symptoms[k])).join(' · ')}<br>Verify the source before these observations can support a conclusion.</div>`:'');
  const visible=report.results.filter(f=>f.status!=='Unassessed');$('findings').innerHTML=visible.length?visible.map((f,i)=>`<details class="fault" ${i===0?'open':''}><summary><span class="status ${f.status}">${f.status}</span><span class="badge">${f.severity}</span><h3>${E(f.name)}</h3><div class="micro">${E(f.component)} · ${f.coverage}% coverage</div><div class="meter"><i style="width:${f.coverage}%"></i></div></summary><div class="faultbody"><p>${E(f.cause)}</p>${Object.entries(f.groups).filter(([s,ks])=>ks.length).map(([s,ks])=>`<div class="evidence-line"><b>${s}</b>${ks.map(k=>E(kb.symptoms[k])).join(' · ')}</div>`).join('')}${f.status==='Supported'?`<div class="action"><b>Recommended maintenance</b><br>${E(f.action)}<p>Relative cost: ${f.cost} · Downtime: ${f.downtime}</p><button class="smallbutton" data-ticket="${f.id}">＋ Create maintenance task</button></div>`:''}<div class="micro">${E(f.provenance)}</div></div></details>`).join(''):`<div class="panel empty"><div class="target">◎</div><h3>Start with what you observe.</h3><p>Select symptoms, take a guided assessment, or explore a sample investigation.</p><button class="primary" id="trydemo">Explore a payload fault ↗</button></div>`;
- $('nextquestions').innerHTML=report.questions.length?`<div class="questionbox"><h3>Next best checks</h3>${report.questions.slice(0,4).map(k=>`<button data-question="${k}">↗ ${E(kb.symptoms[k])}</button>`).join('')}</div>`:'';$('tracecount').textContent=report.trace.length+' steps';$('trace').innerHTML=report.trace.map((t,i)=>`<div class="trace-step">${String(i+1).padStart(2,'0')} / ${E(t)}</div>`).join('')||'<p class="micro">No inference steps yet.</p>';$('casebadge').textContent=w.cases.length;persist();}
+ $('nextquestions').innerHTML=report.questions.length?`<div class="questionbox"><h3>Next best checks</h3>${report.questions.slice(0,4).map(k=>`<button data-question="${k}">↗ ${E(kb.symptoms[k])}</button>`).join('')}</div>`:'';$('tracecount').textContent=report.trace.length+' steps';$('trace').innerHTML=report.trace.map((t,i)=>`<div class="trace-step" style="--i:${i}">${String(i+1).padStart(2,'0')} / ${E(t)}</div>`).join('')||'<p class="micro">No inference steps yet.</p>';$('casebadge').textContent=w.cases.length;pulseEnter($('findings'));persist();}
 function guided(){const candidates=[...report.questions,...Object.keys(kb.symptoms).filter(k=>(evidence[k]||'unknown')==='unknown')];const k=candidates.find(k=>!guideSeen.has(k));if(!k){modal('<h2>Assessment complete</h2><p>All remaining observations were reviewed or skipped. Inspect the findings and resolve missing evidence when it becomes available.</p><button class="primary" data-close>View findings</button>');return;}modal(`<div class="eyebrow">GUIDED EVIDENCE COLLECTION</div><h2 style="margin-top:16px">One observation at a time.</h2><p>Record known information only. Do not perform physical tests without approved procedures.</p><div class="guidedquestion">${E(kb.symptoms[k])}?</div><div class="guidedanswers">${states.map((s,i)=>`<button class="${s==='yes'?'primary':'secondary'}" data-answer="${s}" data-key="${k}">${['Skip','Yes','No','Conflict'][i]}</button>`).join('')}</div><div class="modalbuttons"><button class="quiet" data-close>Finish assessment</button></div>`);}
 
 function showEvidenceDialog(){
@@ -40,10 +96,35 @@ function renderBoard(){$('board').innerHTML=['Open','In progress','Completed'].m
 function renderRules(){$('rulecards').innerHTML=kb.faults.map((f,i)=>`<article class="rulecard"><div class="eyebrow">R${String(i+1).padStart(2,'0')} / ${E(f.component)}</div><h3>${E(f.name)}</h3><code>IF ${f.conditions.map(k=>E(kb.symptoms[k])+' = YES').join('<br>AND ')}<br>THEN ${E(f.name)}</code><p>${E(f.provenance)}</p><div class="cardactions"><span class="badge">${f.severity} · ${f.cost} cost</span><button class="smallbutton" data-edit="${f.id}">Edit rule ↗</button></div></article>`).join('');}
 function editRule(id){const f=kb.faults.find(f=>f.id===id);modal(`<h2>Edit diagnostic rule</h2><p>Changes affect future diagnoses. These are educational rules and require expert validation.</p><form id="ruleform" data-id="${id}"><label>Fault name<input name="name" value="${E(f.name)}" required maxlength="120"></label><div class="two"><label>Severity<select name="severity">${['Critical','High','Medium'].map(x=>`<option ${x===f.severity?'selected':''}>${x}</option>`).join('')}</select></label><label>Relative cost<select name="cost">${['Low','Medium','High'].map(x=>`<option ${x===f.cost?'selected':''}>${x}</option>`).join('')}</select></label></div><label>Downtime<select name="downtime">${['Short','Medium','Long'].map(x=>`<option ${x===f.downtime?'selected':''}>${x}</option>`).join('')}</select></label><p>Required observations (all must be Yes)</p><div class="checklist">${Object.entries(kb.symptoms).map(([k,l])=>`<label><input type="checkbox" name="condition" value="${k}" ${f.conditions.includes(k)?'checked':''}>${E(l)}</label>`).join('')}</div><label>Cause<textarea name="cause" required maxlength="2000">${E(f.cause)}</textarea></label><label>Maintenance action<textarea name="action" required maxlength="2000">${E(f.action)}</textarea></label><div id="ruleerror" class="error"></div><div class="modalbuttons"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Save rule</button></div></form>`);}
 function evaluate(){const rows=demos.map(c=>{const actual=diagnose(kb,c.evidence).results.filter(f=>f.status==='Supported').map(f=>f.id).sort(),expected=[...c.expected_supported].sort();return {name:c.name,actual,expected,pass:JSON.stringify(actual)===JSON.stringify(expected)};});$('testresults').classList.remove('empty');$('testresults').innerHTML=`<div class="panelhead"><h2>${rows.filter(r=>r.pass).length} / ${rows.length} scenarios passed</h2><span class="badge">Current rules · ${new Date().toLocaleTimeString()}</span></div><div class="tablewrap"><table><thead><tr><th>SCENARIO</th><th>EXPECTED</th><th>ACTUAL</th><th>RESULT</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${E(r.name)}</td><td>${E(r.expected.join(', ')||'None')}</td><td>${E(r.actual.join(', ')||'None')}</td><td class="${r.pass?'pass':'fail'}">${r.pass?'PASS':'FAIL'}</td></tr>`).join('')}</tbody></table></div>`;}
-try{[base,demos]=await Promise.all(['knowledge_base.json','sample_cases.json'].map(async p=>{const r=await fetch(p);if(!r.ok)throw Error('Data load failed');return r.json();}));w={format:KEY,kb:structuredClone(base),cases:[],tickets:[]};try{const raw=localStorage.getItem(KEY);if(raw)w=validateWorkspace(JSON.parse(raw),base);}catch{toast('Stored data could not be loaded. Starting a fresh session.');}kb=w.kb;
+try{[base,demos]=await Promise.all(['knowledge_base.json','sample_cases.json'].map(async p=>{const r=await fetch(p);if(!r.ok)throw Error('Data load failed');return r.json();}));w={format:KEY,kb:structuredClone(base),cases:[],tickets:[]};try{const raw=localStorage.getItem(KEY);if(raw)w=validateWorkspace(JSON.parse(raw),base);}catch{toast('Stored data could not be loaded. Starting a fresh session.');}
+ if(cloudEnabled()){
+  setSyncUI('ready');
+  try{
+   const remote=await pullWorkspace();
+   if(remote?.workspace){
+    const localEmpty=!w.cases.length&&!w.tickets.length;
+    const cloudHas=(Array.isArray(remote.workspace.cases)&&remote.workspace.cases.length)||(Array.isArray(remote.workspace.tickets)&&remote.workspace.tickets.length);
+    if(localEmpty&&cloudHas){w=validateWorkspace({...remote.workspace,format:KEY,kb:remote.workspace.kb||structuredClone(base)},base);localStorage.setItem(KEY,JSON.stringify(w));toast('Loaded shared workspace from Supabase.');setSyncUI('ok');}
+   }
+  }catch(err){setSyncUI('err',err.message);toast('Could not reach Supabase. Working offline.');}
+ }else setSyncUI('local');
+ kb=w.kb;
  for(const [i,c] of demos.entries())$('demo').add(new Option(c.name,i));for(const f of kb.faults)$('component').add(new Option(f.component,f.id));$('loading').hidden=true;$('studio').hidden=false;setDraft(w.draft||{evidence:{}});
+ // Soft blended glow that follows the pointer
+ const glow=$('cursor-glow');
+ if(glow&&window.matchMedia('(pointer:fine)').matches&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  let gx=-999,gy=-999,tx=-999,ty=-999;
+  document.body.classList.add('has-cursor-glow');
+  window.addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;glow.classList.add('on');},{passive:true});
+  window.addEventListener('pointerleave',()=>glow.classList.remove('on'));
+  (function follow(){gx+=(tx-gx)*.14;gy+=(ty-gy)*.14;glow.style.transform=`translate3d(${gx}px,${gy}px,0) translate(-50%,-50%)`;requestAnimationFrame(follow);})();
+ }
  document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>page(b.dataset.page));$('theme').onclick=()=>document.body.classList.toggle('light');$('search').oninput=renderSymptoms;$('component').onchange=renderSymptoms;$('policy').onchange=render;['casename','asset','notes'].forEach(k=>$(k).oninput=persist);$('demo').onchange=()=>{if($('demo').value!=='')useDemo(Number($('demo').value));};
- $('symptoms').onclick=e=>{const b=e.target.closest('[data-key]');if(!b)return;evidence[b.dataset.key]=b.dataset.state;delete records[b.dataset.key];$('demo').value='';b.parentElement.querySelectorAll('button').forEach(x=>{x.classList.toggle('chosen',x===b);x.setAttribute('aria-pressed',x===b);});render();};
+ if($('cloudsync'))$('cloudsync').onclick=()=>syncCloud(true);
+ $('symptoms').onclick=e=>{const b=e.target.closest('[data-key]');if(!b)return;evidence[b.dataset.key]=b.dataset.state;delete records[b.dataset.key];$('demo').value='';b.parentElement.querySelectorAll('button').forEach(x=>{x.classList.toggle('chosen',x===b);x.setAttribute('aria-pressed',x===b);x.classList.remove('pop');});b.classList.add('pop');render();};
+ if($('vivademo'))$('vivademo').onclick=()=>runVivaDemo();
+ setTimeout(dismissSplash,window.matchMedia('(prefers-reduced-motion: reduce)').matches?150:2100);
+ if($('splash'))$('splash').onclick=dismissSplash;
  $('newcase').onclick=()=>{modal('<h2>Start a new investigation?</h2><p>The current draft will be cleared. Save it first if you need to keep it.</p><div class="modalbuttons"><button class="secondary" data-close>Cancel</button><button class="primary" id="confirmnew">Start new</button></div>');};
  $('guided').onclick=()=>{guideSeen=new Set();guided();};$('addevidence').onclick=showEvidenceDialog;$('savecase').onclick=()=>{const d=draft();if(!d.name.trim()){toast('Enter a case name first.');$('casename').focus();return;}const item={...d,id:uid(),created:new Date().toISOString(),kb:structuredClone(kb)};w.cases.unshift(item);if(!persist()){w.cases.shift();return;}render();toast('Investigation saved locally.');};
  $('findings').onclick=e=>{if(e.target.id==='trydemo')useDemo(0);const b=e.target.closest('[data-ticket]');if(b){const f=report.results.find(f=>f.id===b.dataset.ticket);const asset=$('asset').value;if(w.tickets.some(t=>t.fault===f.id&&t.asset===asset&&t.status!=='Completed')){toast('An active task already exists for this fault and asset.');return;}w.tickets.push({id:uid(),fault:f.id,name:f.name,action:f.action,severity:f.severity,asset,status:'Open'});persist();toast('Task added to maintenance board.');}};
