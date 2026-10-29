@@ -84,7 +84,7 @@ Official brief: [`course/KBS CCP.pdf`](course/KBS%20CCP.pdf) · Template: [`cour
 | 2 | **Report** (prescribed template) | [`docs/KBS_Robotic_Arm_CCP_Report.md`](docs/KBS_Robotic_Arm_CCP_Report.md) / [`.docx`](docs/KBS_Robotic_Arm_CCP_Report.docx) |
 | 2 | **Presentation** | [`docs/KBS_Robotic_Arm_CCP_Presentation.pptx`](docs/KBS_Robotic_Arm_CCP_Presentation.pptx) |
 | 3 | **Project demonstration** | [Live Vercel demo](https://arm-insight-kbs-dist.vercel.app/) · localhost `serve.py` · **▶ Viva demo** button |
-| 4 | **Viva defence** (analysis, KR, inference, implementation, KB, results) | Guide: [`VIVA_GUIDE_Roman_Urdu.md`](VIVA_GUIDE_Roman_Urdu.md) · Evaluation lab **13/13 PASS** |
+| 4 | **Viva defence** (analysis, KR, inference, implementation, KB, results) | Live demo + **▶ Viva demo** · Evaluation lab **13/13 PASS** · defend KR, inference, KB, results |
 
 Submit on **Google Classroom** per course deadline; export PDF from the Word report after filling student details & screenshots.
 
@@ -169,7 +169,6 @@ arm-insight-kbs/
 ├── supabase/schema.sql      # Cloud tables + RLS (demo)
 ├── docs/                    # Report + presentation (submission)
 ├── course/                  # CCP brief + report template
-├── VIVA_GUIDE_Roman_Urdu.md # Viva prep notes
 ├── serve.py                 # Local static server
 ├── test*.mjs                # Node regression checks
 └── vercel.json              # Publishes dist/
