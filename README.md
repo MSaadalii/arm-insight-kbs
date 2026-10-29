@@ -115,8 +115,8 @@ Do **not** open `dist/index.html` as a file — the app loads ES modules and JSO
 | Item | Link / note |
 |------|-------------|
 | Public demo | [arm-insight-kbs-dist.vercel.app](https://arm-insight-kbs-dist.vercel.app/) |
-| Supabase setup | [SUPABASE_SETUP.md](SUPABASE_SETUP.md) |
 | Schema | [`supabase/schema.sql`](supabase/schema.sql) |
+| Config | `dist/config.mjs` (Supabase URL + anon key) |
 
 Works fully offline via browser `localStorage`. With keys in `dist/config.mjs`, use **Sync with Supabase** in the sidebar.
 
