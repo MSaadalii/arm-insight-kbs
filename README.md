@@ -197,13 +197,8 @@ node test-evidence.mjs
 
 | Doc | Purpose |
 |-----|---------|
-| [docs/KBS_Robotic_Arm_CCP_Report.docx](docs/KBS_Robotic_Arm_CCP_Report.docx) | Report (Word — edit names/screenshots, export PDF) |
-| [docs/KBS_Robotic_Arm_CCP_Report.md](docs/KBS_Robotic_Arm_CCP_Report.md) | Report source (Markdown) |
+| [docs/KBS_Robotic_Arm_CCP_Report.docx](docs/KBS_Robotic_Arm_CCP_Report.docx) | Report |
 | [docs/KBS_Robotic_Arm_CCP_Presentation.pptx](docs/KBS_Robotic_Arm_CCP_Presentation.pptx) | Presentation deck |
-| [course/KBS CCP.pdf](course/KBS%20CCP.pdf) | Official CCP brief + rubrics |
-| [course/KBS CCP Report Template.pdf](course/KBS%20CCP%20Report%20Template.pdf) | Prescribed template |
-| [VIVA_GUIDE_Roman_Urdu.md](VIVA_GUIDE_Roman_Urdu.md) | Viva prep (Roman Urdu) |
-| [SUPABASE_SETUP.md](SUPABASE_SETUP.md) | Cloud + Vercel steps |
 
 ---
 
