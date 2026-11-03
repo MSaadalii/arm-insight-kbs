@@ -1,7 +1,8 @@
 import {diagnose} from './engine.mjs';
 import {validateKB,validateWorkspace} from './state.mjs';
 import {SOURCES,resolveClaims} from './evidence.mjs';
-import {cloudEnabled,pullWorkspace,pushWorkspace} from './cloud.mjs';
+let cloudEnabled=()=>false,pullWorkspace=async()=>null,pushWorkspace=async()=>({ok:false,reason:'offline'});
+try{({cloudEnabled,pullWorkspace,pushWorkspace}=await import('./cloud.mjs'));}catch(error){console.warn('Cloud sync unavailable; continuing in local-only mode.',error);}
 const $=id=>document.getElementById(id), E=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
 const KEY='arm-insight-v2',states=['unknown','yes','no','conflict'];let base,kb,demos,w,evidence={},records={},report,selected=new Set(),toastTimer,guideSeen=new Set(),cloudTimer=null,cloudBusy=false;

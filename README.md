@@ -262,3 +262,8 @@ node test-evidence.mjs
 
 Semester project for **NED UET — Knowledge Based Systems (CT-359)**.  
 Use for learning and demonstration only.
+
+
+## PWA / Install
+
+Install ARM / INSIGHT from Chrome using the install icon in the address bar, on Android with **Add to Home screen**, or on iOS with **Share → Add to Home Screen**. After the first visit, the service worker caches the app files so the diagnostic workspace can open offline; Supabase sync needs a network connection. To refresh the offline cache on a deploy, bump the `CACHE` version in `dist/sw.js`.
